@@ -75,8 +75,7 @@ async function openChallenge(id) {
   } else {
     // Not full — current user may need to join or is waiting
     if (!me.connected) {
-      // Redirect to Strava auth to join
-      window.location.href = `/auth/login?action=join&challenge=${id}`;
+      window.location.href = `/auth/login?challenge=${id}`;
       return;
     }
     const alreadyIn = challenge.riders.some(r => r.isMe);
@@ -92,12 +91,14 @@ async function openChallenge(id) {
 
 // ── Home actions ──────────────────────────────────────────────
 
-function startChallenge() {
+async function startChallenge() {
   if (!me.connected) {
-    window.location.href = '/auth/login?action=create';
-  } else {
-    window.location.href = '/auth/login?action=create';
+    window.location.href = '/auth/login';
+    return;
   }
+  const res = await fetch('/api/challenge/create', { method: 'POST' });
+  const { id } = await res.json();
+  await openChallenge(id);
 }
 
 function showJoinPanel() {

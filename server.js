@@ -33,8 +33,6 @@ app.use(session({
 
 app.get('/auth/login', (req, res) => {
   req.session.pendingChallenge = req.query.challenge || null;
-  req.session.pendingAction = req.query.action || 'create';
-  req.session.pendingName = req.query.name || null;
   const url = `https://www.strava.com/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=activity:read_all`;
   res.redirect(url);
 });
@@ -62,13 +60,13 @@ app.get('/auth/callback', async (req, res) => {
     req.session.athleteId = athleteId;
     if (!req.session.myChallenges) req.session.myChallenges = [];
 
-    const miles = await fetchMonthlyMiles(access_token);
-    const action = req.session.pendingAction;
     const pendingId = req.session.pendingChallenge;
 
-    if (action === 'join' && pendingId && challenges[pendingId]) {
+    // If coming from a challenge link, join it
+    if (pendingId && challenges[pendingId]) {
       const c = challenges[pendingId];
       if (!c.riders.includes(athleteId) && c.riders.length < 2) {
+        const miles = await fetchMonthlyMiles(access_token);
         c.riders.push(athleteId);
         c.miles[athleteId] = miles;
         if (!req.session.myChallenges.includes(pendingId)) req.session.myChallenges.push(pendingId);
@@ -76,21 +74,30 @@ app.get('/auth/callback', async (req, res) => {
       return res.redirect(`/?challenge=${pendingId}`);
     }
 
-    // Create new challenge
-    const challengeId = generateId();
-    challenges[challengeId] = {
-      id: challengeId,
-      name: req.session.pendingName || 'Rivalry',
-      riders: [athleteId],
-      miles: { [athleteId]: miles },
-      createdAt: Date.now(),
-    };
-    req.session.myChallenges.push(challengeId);
-    res.redirect(`/?challenge=${challengeId}`);
+    // Otherwise just land on home — no auto-created challenge
+    res.redirect('/');
   } catch (err) {
     console.error('Auth error:', err.response?.data || err.message);
     res.redirect('/?error=auth_failed');
   }
+});
+
+// Create a challenge (must be logged in)
+app.post('/api/challenge/create', async (req, res) => {
+  const athleteId = req.session.athleteId;
+  if (!athleteId) return res.status(401).json({ error: 'Not connected' });
+
+  const miles = await fetchMonthlyMiles(athletes[athleteId].token);
+  const challengeId = generateId();
+  challenges[challengeId] = {
+    id: challengeId,
+    name: 'Rivalry',
+    riders: [athleteId],
+    miles: { [athleteId]: miles },
+    createdAt: Date.now(),
+  };
+  req.session.myChallenges.push(challengeId);
+  res.json({ id: challengeId });
 });
 
 // ── API ───────────────────────────────────────────────────────────────────────
