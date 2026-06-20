@@ -74,9 +74,6 @@ function showView(id) {
 
 function showHome() {
   showView('home-view');
-  const now = new Date();
-  document.getElementById('home-month').textContent =
-    `${MONTHS[now.getMonth()]} ${now.getFullYear()} · Bike Miles`;
   refreshHome();
 }
 
