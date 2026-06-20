@@ -281,6 +281,9 @@ function showRivalry(challenge) {
     document.getElementById('bfill2').style.height = `${(r2.miles / max) * 100}%`;
   });
 
+  // Stats grid
+  renderStats(r1, r2);
+
   // Lead message
   const msgEl = document.getElementById('lead-message');
   const total = r1.miles + r2.miles;
@@ -296,6 +299,43 @@ function showRivalry(challenge) {
     msgEl.textContent = `${firstName(leader.name)} leads by ${gap} miles 🔥`;
     msgEl.style.color = r1.miles > r2.miles ? '#fc4c02' : '#3b82f6';
   }
+}
+
+function renderStats(r1, r2) {
+  const fmtTime = s => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+  const fmtElev = ft => ft >= 1000 ? `${(ft/1000).toFixed(1)}k ft` : `${ft} ft`;
+
+  const stats = [
+    { label: '🚴 Rides',        v1: r1.rides,          v2: r2.rides,          fmt: v => `${v}` },
+    { label: '⛰️ Elevation',    v1: r1.elevationFt,    v2: r2.elevationFt,    fmt: fmtElev },
+    { label: '⏱️ Time riding',  v1: r1.movingTimeSec,  v2: r2.movingTimeSec,  fmt: fmtTime },
+    { label: '🏁 Longest ride', v1: r1.longestRideMi,  v2: r2.longestRideMi,  fmt: v => `${v} mi` },
+  ];
+
+  const grid = document.getElementById('stat-grid');
+  grid.innerHTML = stats.map(({ label, v1, v2, fmt }) => {
+    const max = Math.max(v1, v2, 1);
+    const pct1 = Math.round((v1 / max) * 100);
+    const pct2 = Math.round((v2 / max) * 100);
+    const c1 = v1 > v2 ? 'winner-orange' : v1 < v2 ? '' : '';
+    const c2 = v2 > v1 ? 'winner-blue'   : v2 < v1 ? '' : '';
+    return `
+      <div class="stat-row">
+        <div class="stat-label">${label}</div>
+        <div class="stat-values">
+          <div class="stat-val ${c1}">${fmt(v1)}</div>
+          <div class="stat-bar-track">
+            <div class="stat-bar-fill"      style="width:${pct1}%"></div>
+            <div class="stat-bar-fill-blue" style="width:${pct2}%"></div>
+          </div>
+          <div class="stat-val stat-val-right ${c2}">${fmt(v2)}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function refreshChallenge() {

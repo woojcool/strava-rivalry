@@ -33,11 +33,22 @@ async function initDb() {
       end_date BIGINT
     );
     CREATE TABLE IF NOT EXISTS challenge_riders (
-      challenge_id TEXT REFERENCES challenges(id),
-      athlete_id  TEXT REFERENCES athletes(id),
-      miles       REAL DEFAULT 0,
+      challenge_id    TEXT REFERENCES challenges(id),
+      athlete_id      TEXT REFERENCES athletes(id),
+      miles           REAL DEFAULT 0,
+      rides           INT  DEFAULT 0,
+      elevation_ft    REAL DEFAULT 0,
+      moving_time_sec BIGINT DEFAULT 0,
+      longest_ride_mi REAL DEFAULT 0,
       PRIMARY KEY (challenge_id, athlete_id)
     );
+  `);
+  // Safe migrations for existing DBs
+  await pool.query(`
+    ALTER TABLE challenge_riders ADD COLUMN IF NOT EXISTS rides           INT    DEFAULT 0;
+    ALTER TABLE challenge_riders ADD COLUMN IF NOT EXISTS elevation_ft    REAL   DEFAULT 0;
+    ALTER TABLE challenge_riders ADD COLUMN IF NOT EXISTS moving_time_sec BIGINT DEFAULT 0;
+    ALTER TABLE challenge_riders ADD COLUMN IF NOT EXISTS longest_ride_mi REAL   DEFAULT 0;
   `);
 }
 
@@ -96,10 +107,12 @@ app.get('/auth/callback', async (req, res) => {
         );
         const alreadyIn = existing.some(r => r.athlete_id === athleteId);
         if (!alreadyIn && existing.length < 2) {
-          const miles = await fetchMilesSince(access_token, c.start_date);
+          const s = await fetchStatsSince(access_token, c.start_date);
           await pool.query(
-            'INSERT INTO challenge_riders (challenge_id, athlete_id, miles) VALUES ($1,$2,$3)',
-            [pendingId, athleteId, miles]
+            `INSERT INTO challenge_riders
+               (challenge_id, athlete_id, miles, rides, elevation_ft, moving_time_sec, longest_ride_mi)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [pendingId, athleteId, s.miles, s.rides, s.elevationFt, s.movingTimeSec, s.longestRideMi]
           );
         }
         return res.redirect(`/c/${pendingId}`);
@@ -124,7 +137,7 @@ app.post('/api/challenge/create', async (req, res) => {
   const end   = endDate   || start + 30 * 86400;
 
   const { rows: [athlete] } = await pool.query('SELECT token FROM athletes WHERE id=$1', [athleteId]);
-  const miles = await fetchMilesSince(athlete.token, start);
+  const s = await fetchStatsSince(athlete.token, start);
 
   const id = generateId();
   await pool.query(
@@ -132,8 +145,10 @@ app.post('/api/challenge/create', async (req, res) => {
     [id, name, start, end]
   );
   await pool.query(
-    'INSERT INTO challenge_riders (challenge_id, athlete_id, miles) VALUES ($1,$2,$3)',
-    [id, athleteId, miles]
+    `INSERT INTO challenge_riders
+       (challenge_id, athlete_id, miles, rides, elevation_ft, moving_time_sec, longest_ride_mi)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [id, athleteId, s.miles, s.rides, s.elevationFt, s.movingTimeSec, s.longestRideMi]
   );
   res.json({ id });
 });
@@ -178,10 +193,12 @@ app.post('/api/challenge/:id/join', async (req, res) => {
   if (riders.some(r => r.athlete_id === athleteId)) return res.status(400).json({ error: 'Already in this challenge' });
 
   const { rows: [athlete] } = await pool.query('SELECT token FROM athletes WHERE id=$1', [athleteId]);
-  const miles = await fetchMilesSince(athlete.token, c.start_date);
+  const s = await fetchStatsSince(athlete.token, c.start_date);
   await pool.query(
-    'INSERT INTO challenge_riders (challenge_id, athlete_id, miles) VALUES ($1,$2,$3)',
-    [req.params.id, athleteId, miles]
+    `INSERT INTO challenge_riders
+       (challenge_id, athlete_id, miles, rides, elevation_ft, moving_time_sec, longest_ride_mi)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [req.params.id, athleteId, s.miles, s.rides, s.elevationFt, s.movingTimeSec, s.longestRideMi]
   );
 
   res.json(await formatChallenge(req.params.id, athleteId));
@@ -197,10 +214,12 @@ app.post('/api/challenge/:id/refresh', async (req, res) => {
   if (!c || !athleteId || !riders.length) return res.status(401).json({ error: 'Not authorized' });
 
   const { rows: [athlete] } = await pool.query('SELECT token FROM athletes WHERE id=$1', [athleteId]);
-  const miles = await fetchMilesSince(athlete.token, c.start_date);
+  const s = await fetchStatsSince(athlete.token, c.start_date);
   await pool.query(
-    'UPDATE challenge_riders SET miles=$1 WHERE challenge_id=$2 AND athlete_id=$3',
-    [miles, req.params.id, athleteId]
+    `UPDATE challenge_riders
+     SET miles=$1, rides=$2, elevation_ft=$3, moving_time_sec=$4, longest_ride_mi=$5
+     WHERE challenge_id=$6 AND athlete_id=$7`,
+    [s.miles, s.rides, s.elevationFt, s.movingTimeSec, s.longestRideMi, req.params.id, athleteId]
   );
   res.json(await formatChallenge(req.params.id, athleteId));
 });
@@ -212,7 +231,8 @@ async function formatChallenge(id, currentAthleteId) {
   if (!c) return null;
 
   const { rows: riders } = await pool.query(
-    `SELECT cr.miles, cr.athlete_id, a.name, a.photo_url
+    `SELECT cr.miles, cr.rides, cr.elevation_ft, cr.moving_time_sec, cr.longest_ride_mi,
+            cr.athlete_id, a.name, a.photo_url
      FROM challenge_riders cr
      JOIN athletes a ON a.id = cr.athlete_id
      WHERE cr.challenge_id = $1`,
@@ -238,13 +258,18 @@ async function formatChallenge(id, currentAthleteId) {
       name: r.name,
       photoUrl: r.photo_url,
       miles: r.miles,
+      rides: r.rides,
+      elevationFt: r.elevation_ft,
+      movingTimeSec: r.moving_time_sec,
+      longestRideMi: r.longest_ride_mi,
       isMe: r.athlete_id === currentAthleteId,
     })),
   };
 }
 
-async function fetchMilesSince(token, afterTs) {
-  let page = 1, totalMeters = 0;
+async function fetchStatsSince(token, afterTs) {
+  let page = 1;
+  let totalMeters = 0, rides = 0, elevationM = 0, movingTimeSec = 0, longestM = 0;
   while (true) {
     const { data } = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
       headers: { Authorization: `Bearer ${token}` },
@@ -252,12 +277,24 @@ async function fetchMilesSince(token, afterTs) {
     });
     if (!data.length) break;
     data.forEach(act => {
-      if (act.type === 'Ride' || act.sport_type === 'Ride') totalMeters += act.distance;
+      if (act.type === 'Ride' || act.sport_type === 'Ride') {
+        totalMeters   += act.distance || 0;
+        elevationM    += act.total_elevation_gain || 0;
+        movingTimeSec += act.moving_time || 0;
+        if ((act.distance || 0) > longestM) longestM = act.distance;
+        rides++;
+      }
     });
     if (data.length < 100) break;
     page++;
   }
-  return Math.round((totalMeters / 1609.344) * 10) / 10;
+  return {
+    miles:         Math.round((totalMeters / 1609.344) * 10) / 10,
+    rides,
+    elevationFt:   Math.round(elevationM * 3.28084),
+    movingTimeSec,
+    longestRideMi: Math.round((longestM / 1609.344) * 10) / 10,
+  };
 }
 
 // Serve index.html for all non-API routes (SPA routing)

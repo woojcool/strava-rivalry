@@ -324,6 +324,64 @@ header {
   text-overflow: ellipsis;
 }
 
+/* Stat grid */
+.stat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.stat-row {
+  background: #1a1a1a;
+  border: 1px solid #222;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #444;
+  margin-bottom: 10px;
+}
+.stat-values {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.stat-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  width: 80px;
+  color: #555;
+}
+.stat-val.winner-orange { color: #fc4c02; }
+.stat-val.winner-blue   { color: #3b82f6; }
+.stat-val-right { text-align: right; }
+.stat-bar-track {
+  flex: 1;
+  height: 6px;
+  background: #111;
+  border-radius: 3px;
+  overflow: visible;
+  position: relative;
+}
+.stat-bar-fill {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #fc4c02;
+}
+.stat-bar-fill-blue {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #3b82f6;
+}
+
 .lead-message {
   text-align: center;
   font-size: 1rem;
