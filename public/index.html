@@ -10,89 +10,117 @@
   <div class="app">
     <header>
       <div class="logo">🚴 Strava Rivalry</div>
-      <div class="subtitle" id="month-label"></div>
+      <div id="user-chip" class="user-chip hidden"></div>
     </header>
 
-    <main>
-      <!-- Not connected state -->
-      <section id="connect-section" class="hidden">
-        <div class="connect-card">
-          <div class="connect-icon">🔗</div>
-          <h2>Connect your Strava</h2>
-          <p>Link your account to join the rivalry. Your friend needs to connect too!</p>
-          <a href="/auth/login" class="btn btn-strava">Connect with Strava</a>
+    <!-- ── Home view ─────────────────────────────────────────── -->
+    <section id="home-view" class="view hidden">
+      <div class="hero">
+        <div class="hero-title">Who rides more<br/>this month?</div>
+        <div class="hero-sub" id="home-month"></div>
+      </div>
+
+      <div class="action-cards">
+        <button class="action-card card-orange" onclick="startChallenge()">
+          <div class="action-icon">⚔️</div>
+          <div class="action-label">Start a Challenge</div>
+          <div class="action-desc">Create a new rivalry and invite a friend</div>
+        </button>
+        <button class="action-card card-blue" onclick="showJoinPanel()">
+          <div class="action-icon">🔗</div>
+          <div class="action-label">Join a Challenge</div>
+          <div class="action-desc">Enter a code from a friend</div>
+        </button>
+      </div>
+
+      <!-- Join panel -->
+      <div id="join-panel" class="join-panel hidden">
+        <input id="join-code" class="code-input" placeholder="Enter 6-character code" maxlength="6" />
+        <button class="btn btn-blue" onclick="joinChallenge()">Join</button>
+      </div>
+
+      <!-- My challenges -->
+      <div id="my-challenges-section" class="hidden">
+        <div class="section-title">Your Challenges</div>
+        <div id="challenges-list" class="challenges-list"></div>
+      </div>
+
+      <!-- Not connected prompt -->
+      <div id="connect-prompt" class="connect-prompt hidden">
+        <p>Connect your Strava to get started</p>
+        <a href="/auth/login" class="btn btn-strava">Connect with Strava</a>
+      </div>
+    </section>
+
+    <!-- ── Waiting view ───────────────────────────────────────── -->
+    <section id="waiting-view" class="view hidden">
+      <button class="back-btn" onclick="goHome()">← Back</button>
+      <div class="connect-card">
+        <div class="connect-icon">⏳</div>
+        <h2>Challenge created!</h2>
+        <p>Share this code with your friend:</p>
+        <div class="big-code" id="waiting-code"></div>
+        <p class="or-text">or share the link</p>
+        <div class="share-url">
+          <span id="share-url-text"></span>
+          <button class="copy-btn" onclick="copyUrl()">Copy</button>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Waiting for friend state -->
-      <section id="waiting-section" class="hidden">
-        <div class="connect-card">
-          <div class="connect-icon">⏳</div>
-          <h2>You're in!</h2>
-          <p id="waiting-name" class="waiting-name"></p>
-          <p>Now have your friend open this page and connect their Strava.</p>
-          <div class="share-url">
-            <span id="share-url-text"></span>
-            <button class="copy-btn" onclick="copyUrl()">Copy</button>
-          </div>
+    <!-- ── Rivalry view ──────────────────────────────────────── -->
+    <section id="rivalry-view" class="view hidden">
+      <button class="back-btn" onclick="goHome()">← Back</button>
+
+      <div class="challenge-name" id="rivalry-name"></div>
+      <div class="challenge-month" id="rivalry-month"></div>
+
+      <div class="vs-header">
+        <div class="rider-head" id="rider1-head">
+          <img id="rider1-photo" class="avatar" src="" alt="" />
+          <div class="rider-name" id="rider1-name"></div>
+          <div class="rider-miles" id="rider1-miles"></div>
         </div>
-      </section>
-
-      <!-- Rivalry board -->
-      <section id="rivalry-section" class="hidden">
-        <div class="rivalry-container">
-          <div class="vs-header">
-            <div class="rider-head" id="rider1-head">
-              <img id="rider1-photo" class="avatar" src="" alt="" />
-              <div class="rider-name" id="rider1-name"></div>
-              <div class="rider-miles" id="rider1-miles"></div>
-            </div>
-            <div class="vs-badge">VS</div>
-            <div class="rider-head" id="rider2-head">
-              <img id="rider2-photo" class="avatar" src="" alt="" />
-              <div class="rider-name" id="rider2-name"></div>
-              <div class="rider-miles" id="rider2-miles"></div>
-            </div>
-          </div>
-
-          <div class="bar-arena">
-            <div class="bar-label" id="bar-label-left"></div>
-            <div class="tug-bar-track">
-              <div class="tug-bar" id="tug-bar"></div>
-              <div class="tug-center-line"></div>
-            </div>
-            <div class="bar-label" id="bar-label-right"></div>
-          </div>
-
-          <div class="lead-message" id="lead-message"></div>
-
-          <div class="individual-bars">
-            <div class="ind-bar-row">
-              <div class="ind-name" id="ind1-name"></div>
-              <div class="ind-track">
-                <div class="ind-fill fill-orange" id="ind1-fill"></div>
-              </div>
-              <div class="ind-val" id="ind1-val"></div>
-            </div>
-            <div class="ind-bar-row">
-              <div class="ind-name" id="ind2-name"></div>
-              <div class="ind-track">
-                <div class="ind-fill fill-blue" id="ind2-fill"></div>
-              </div>
-              <div class="ind-val" id="ind2-val"></div>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button class="btn btn-secondary" onclick="loadStatus()">↻ Refresh</button>
-            <button class="btn btn-danger" onclick="resetAll()">Reset</button>
-          </div>
+        <div class="vs-badge">VS</div>
+        <div class="rider-head" id="rider2-head">
+          <img id="rider2-photo" class="avatar" src="" alt="" />
+          <div class="rider-name" id="rider2-name"></div>
+          <div class="rider-miles" id="rider2-miles"></div>
         </div>
-      </section>
+      </div>
 
-      <!-- Error -->
-      <div id="error-banner" class="error-banner hidden"></div>
-    </main>
+      <div class="bar-arena">
+        <div class="tug-bar-track">
+          <div class="tug-bar" id="tug-bar"></div>
+          <div class="tug-center-line"></div>
+        </div>
+      </div>
+
+      <div class="lead-message" id="lead-message"></div>
+
+      <div class="individual-bars">
+        <div class="ind-bar-row">
+          <div class="ind-name" id="ind1-name"></div>
+          <div class="ind-track">
+            <div class="ind-fill fill-orange" id="ind1-fill"></div>
+          </div>
+          <div class="ind-val" id="ind1-val"></div>
+        </div>
+        <div class="ind-bar-row">
+          <div class="ind-name" id="ind2-name"></div>
+          <div class="ind-track">
+            <div class="ind-fill fill-blue" id="ind2-fill"></div>
+          </div>
+          <div class="ind-val" id="ind2-val"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="refreshChallenge()">↻ Refresh</button>
+      </div>
+    </section>
+
+    <div id="error-banner" class="error-banner hidden"></div>
   </div>
 
   <script src="app.js"></script>
