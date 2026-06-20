@@ -24,14 +24,16 @@ async function loadStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
 
-    if (!data.rider1 && !data.rider2) {
+    // If current user isn't connected yet, always show connect screen
+    if (!data.connected) {
       show('connect-section');
       return;
     }
 
-    if (data.rider1 && !data.rider2) {
+    // Current user is connected — wait for friend
+    if (data.slotCount < 2) {
       show('waiting-section');
-      document.getElementById('waiting-name').textContent = `${data.rider1.name} is ready!`;
+      document.getElementById('waiting-name').textContent = `${data.me.name} is ready!`;
       document.getElementById('share-url-text').textContent = window.location.href.split('?')[0];
       return;
     }
