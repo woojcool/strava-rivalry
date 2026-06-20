@@ -267,9 +267,7 @@ function showRivalry(challenge) {
 
   const [r1, r2] = challenge.riders;
 
-  // Avatars & names
-  document.getElementById('bav1').src = r1.photoUrl || '';
-  document.getElementById('bav2').src = r2.photoUrl || '';
+  // Names
   document.getElementById('bn1').textContent = firstName(r1.name);
   document.getElementById('bn2').textContent = firstName(r2.name);
   document.getElementById('bml1').textContent = `${r1.miles} mi`;

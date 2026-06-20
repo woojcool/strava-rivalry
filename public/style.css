@@ -265,11 +265,12 @@ header {
 .bar-chart {
   display: flex;
   align-items: flex-end;
-  gap: 16px;
+  justify-content: center;
+  gap: 24px;
   height: 220px;
 }
 .bar-col {
-  flex: 1;
+  width: 56px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -308,11 +309,12 @@ header {
 
 .bar-names {
   display: flex;
-  gap: 16px;
+  justify-content: center;
+  gap: 24px;
   margin-top: 10px;
 }
 .bar-name-label {
-  flex: 1;
+  width: 56px;
   text-align: center;
   font-size: 0.85rem;
   font-weight: 700;
@@ -321,25 +323,6 @@ header {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.bar-avatars {
-  display: flex;
-  gap: 16px;
-  margin-top: 8px;
-}
-.bar-avatar {
-  flex: 1;
-  width: 100%;
-  height: 44px;
-  width: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  margin: 0 auto;
-  border: 3px solid #222;
-}
-.orange-ring { border-color: #fc4c02; }
-.blue-ring   { border-color: #3b82f6; }
 
 .lead-message {
   text-align: center;
