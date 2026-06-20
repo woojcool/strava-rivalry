@@ -1,24 +1,53 @@
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let me = null; // current user data from /api/me
+let me = null;
 let currentChallengeId = null;
 
-// ── Init ──────────────────────────────────────────────────────
+// ── Init / Router ─────────────────────────────────────────────
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('error') === 'denied') showError('Strava connection was denied.');
-  if (params.get('error') === 'auth_failed') showError('Authentication failed. Check your Strava API credentials.');
+  if (params.get('error') === 'auth_failed') showError('Authentication failed. Check your API credentials.');
 
   me = await fetchMe();
   renderUserChip();
 
-  const challengeId = params.get('challenge');
-  if (challengeId) {
-    await openChallenge(challengeId);
+  route(window.location.pathname);
+}
+
+function route(pathname) {
+  if (pathname === '/create') {
+    showCreate();
+  } else if (pathname.startsWith('/c/')) {
+    const id = pathname.split('/')[2];
+    openChallenge(id);
   } else {
     showHome();
   }
+}
+
+window.addEventListener('popstate', () => route(window.location.pathname));
+
+// ── Navigation ────────────────────────────────────────────────
+
+function goHome() {
+  currentChallengeId = null;
+  history.pushState(null, '', '/');
+  showView('home-view');
+  refreshHome();
+}
+
+function goCreate() {
+  if (!me.connected) { window.location.href = '/auth/login'; return; }
+  history.pushState(null, '', '/create');
+  showCreate();
+}
+
+function goChallenge(id) {
+  history.pushState(null, '', `/c/${id}`);
+  openChallenge(id);
 }
 
 // ── Data ──────────────────────────────────────────────────────
@@ -34,21 +63,24 @@ async function fetchChallenge(id) {
   return res.json();
 }
 
-// ── Routing ───────────────────────────────────────────────────
+// ── Views ─────────────────────────────────────────────────────
 
 function showView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
 
+// ── Home ──────────────────────────────────────────────────────
+
 function showHome() {
-  currentChallengeId = null;
-  history.replaceState(null, '', '/');
   showView('home-view');
-
   const now = new Date();
-  document.getElementById('home-month').textContent = `${MONTHS[now.getMonth()]} ${now.getFullYear()} · Bike Miles`;
+  document.getElementById('home-month').textContent =
+    `${MONTHS[now.getMonth()]} ${now.getFullYear()} · Bike Miles`;
+  refreshHome();
+}
 
+function refreshHome() {
   if (!me.connected) {
     document.getElementById('connect-prompt').classList.remove('hidden');
     document.getElementById('my-challenges-section').classList.add('hidden');
@@ -58,135 +90,157 @@ function showHome() {
   }
 }
 
-function goHome() {
-  history.replaceState(null, '', '/');
-  showHome();
-}
-
-async function openChallenge(id) {
-  currentChallengeId = id;
-  history.replaceState(null, '', `/?challenge=${id}`);
-
-  const challenge = await fetchChallenge(id);
-  if (!challenge) { showError('Challenge not found.'); showHome(); return; }
-
-  if (challenge.full) {
-    showRivalry(challenge);
-  } else {
-    // Not full — current user may need to join or is waiting
-    if (!me.connected) {
-      window.location.href = `/auth/login?challenge=${id}`;
-      return;
-    }
-    const alreadyIn = challenge.riders.some(r => r.isMe);
-    if (!alreadyIn) {
-      // Connected but not in this challenge — join
-      const res = await fetch(`/api/challenge/${id}/join`, { method: 'POST' });
-      const updated = await res.json();
-      if (updated.full) { showRivalry(updated); return; }
-    }
-    showWaiting(challenge);
-  }
-}
-
-// ── Home actions ──────────────────────────────────────────────
-
-function toggleCreatePanel() {
-  if (!me.connected) { window.location.href = '/auth/login'; return; }
-  const panel = document.getElementById('create-panel');
-  panel.classList.toggle('hidden');
-  document.getElementById('join-panel').classList.add('hidden');
-  if (!panel.classList.contains('hidden')) document.getElementById('create-name').focus();
-}
-
-async function submitCreateChallenge() {
-  const name = document.getElementById('create-name').value.trim() || 'Rivalry';
-  const selected = document.querySelector('.dur-btn.selected');
-  const durationDays = selected ? Number(selected.dataset.days) : 30;
-  const res = await fetch('/api/challenge/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, durationDays }),
-  });
-  const { id } = await res.json();
-  await openChallenge(id);
-}
-
 function showJoinPanel() {
   const panel = document.getElementById('join-panel');
-  const isHidden = panel.classList.contains('hidden');
-  panel.classList.toggle('hidden', !isHidden);
-  if (isHidden) document.getElementById('join-code').focus();
+  const wasHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !wasHidden);
+  if (wasHidden) document.getElementById('join-code').focus();
 }
 
 async function joinChallenge() {
   const code = document.getElementById('join-code').value.trim().toUpperCase();
   if (code.length !== 6) { showError('Enter a 6-character code.'); return; }
-  await openChallenge(code);
+  goChallenge(code);
 }
 
-document.getElementById('join-code')?.addEventListener('keydown', e => {
+document.getElementById('join-code').addEventListener('keydown', e => {
   if (e.key === 'Enter') joinChallenge();
 });
-
-document.querySelectorAll('.dur-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-  });
-});
-
-// ── Render: user chip ─────────────────────────────────────────
 
 function renderUserChip() {
   const chip = document.getElementById('user-chip');
   if (!me.connected) { chip.classList.add('hidden'); return; }
-  chip.innerHTML = `<img src="${me.athlete.photoUrl}" /><span>${me.athlete.name.split(' ')[0]}</span>`;
+  chip.innerHTML = `<img src="${me.athlete.photoUrl}" /><span>${firstName(me.athlete.name)}</span>`;
   chip.classList.remove('hidden');
 }
-
-// ── Render: challenges list ───────────────────────────────────
 
 function renderChallengesList() {
   const section = document.getElementById('my-challenges-section');
   const list = document.getElementById('challenges-list');
-
-  if (!me.challenges || me.challenges.length === 0) {
-    section.classList.add('hidden');
-    return;
-  }
-
+  if (!me.challenges || me.challenges.length === 0) { section.classList.add('hidden'); return; }
   section.classList.remove('hidden');
   list.innerHTML = me.challenges.map(c => {
     const r1 = c.riders[0];
-    const r2 = c.riders[1];
-    const avatars = [r1, r2 || null].map(r =>
-      r ? `<img src="${r.photoUrl}" alt="${r.name}" />`
-        : `<div class="avatar-placeholder">?</div>`
-    ).join('');
-
+    const r2 = c.riders[1] || null;
+    const av1 = r1 ? `<img src="${r1.photoUrl}" alt="${r1.name}" />` : '';
+    const av2 = r2 ? `<img src="${r2.photoUrl}" alt="${r2.name}" />` : '<div class="av-placeholder"></div>';
     const status = c.full
-      ? `${r1.miles} mi vs ${r2.miles} mi`
+      ? `${r1.miles} mi vs ${r2.miles} mi · ${c.daysLeft}d left`
       : 'Waiting for opponent…';
-
-    return `
-      <div class="challenge-row" onclick="openChallenge('${c.id}')">
-        <div class="challenge-row-avatars">${avatars}</div>
-        <div class="challenge-row-info">
-          <div class="challenge-row-name">${c.name}</div>
-          <div class="challenge-row-status">${status}</div>
-        </div>
-        <div class="challenge-row-code">${c.id}</div>
-      </div>`;
+    return `<div class="challenge-row" onclick="goChallenge('${c.id}')">
+      <div class="cr-avatars">${av1}${av2}</div>
+      <div class="cr-info">
+        <div class="cr-name">${c.name}</div>
+        <div class="cr-status">${status}</div>
+      </div>
+      <div class="cr-code">${c.id}</div>
+    </div>`;
   }).join('');
 }
 
-// ── Render: waiting ───────────────────────────────────────────
+// ── Create ────────────────────────────────────────────────────
+
+function showCreate() {
+  showView('create-view');
+  const now = new Date();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  document.getElementById('this-month-btn').textContent =
+    `${MONTHS_SHORT[now.getMonth()]} (ends ${endOfMonth.getDate()})`;
+
+  // Set default dates for custom picker
+  const toDateStr = d => d.toISOString().split('T')[0];
+  document.getElementById('custom-start').value = toDateStr(now);
+  document.getElementById('custom-end').value = toDateStr(endOfMonth);
+}
+
+// Duration button selection
+document.querySelectorAll('.dur-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const isCustom = btn.dataset.type === 'custom';
+    document.getElementById('custom-dates').classList.toggle('hidden', !isCustom);
+  });
+});
+
+async function submitCreate() {
+  const name = document.getElementById('create-name').value.trim() || 'Rivalry';
+  const selected = document.querySelector('.dur-btn.selected');
+  const type = selected?.dataset.type;
+
+  let startDate, endDate;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  if (type === 'days') {
+    startDate = nowSec;
+    endDate = nowSec + Number(selected.dataset.days) * 86400;
+  } else if (type === 'month') {
+    const now = new Date();
+    startDate = nowSec;
+    // End at midnight of last day of month
+    endDate = Math.floor(new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime() / 1000);
+  } else if (type === 'custom') {
+    const s = document.getElementById('custom-start').value;
+    const e = document.getElementById('custom-end').value;
+    if (!s || !e) { showError('Pick a start and end date.'); return; }
+    startDate = Math.floor(new Date(s).getTime() / 1000);
+    endDate   = Math.floor(new Date(e + 'T23:59:59').getTime() / 1000);
+    if (endDate <= startDate) { showError('End date must be after start date.'); return; }
+  } else {
+    showError('Pick a duration.'); return;
+  }
+
+  const res = await fetch('/api/challenge/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, startDate, endDate }),
+  });
+  const { id } = await res.json();
+
+  // Refresh me so new challenge appears in list
+  me = await fetchMe();
+  history.pushState(null, '', `/c/${id}`);
+  openChallenge(id);
+}
+
+// ── Challenge ─────────────────────────────────────────────────
+
+async function openChallenge(id) {
+  currentChallengeId = id;
+
+  const challenge = await fetchChallenge(id);
+  if (!challenge) { showError('Challenge not found.'); goHome(); return; }
+
+  if (challenge.full) {
+    showRivalry(challenge);
+    return;
+  }
+
+  if (!me.connected) {
+    window.location.href = `/auth/login?challenge=${id}`;
+    return;
+  }
+
+  const alreadyIn = challenge.riders.some(r => r.isMe);
+  if (!alreadyIn) {
+    const res = await fetch(`/api/challenge/${id}/join`, { method: 'POST' });
+    const updated = await res.json();
+    if (updated.full) { showRivalry(updated); return; }
+    showWaiting(updated);
+    return;
+  }
+
+  showWaiting(challenge);
+}
+
+// ── Waiting ───────────────────────────────────────────────────
 
 function showWaiting(challenge) {
   showView('waiting-view');
   document.getElementById('waiting-code').textContent = challenge.id;
-  const url = `${window.location.origin}/?challenge=${challenge.id}`;
+  document.getElementById('waiting-title').textContent = challenge.name;
+  document.getElementById('waiting-meta').textContent = formatDateRange(challenge);
+  const url = `${window.location.origin}/c/${challenge.id}`;
   document.getElementById('share-url-text').textContent = url;
 }
 
@@ -199,37 +253,42 @@ function copyUrl() {
   });
 }
 
-// ── Render: rivalry ───────────────────────────────────────────
+// ── Rivalry ───────────────────────────────────────────────────
 
 function showRivalry(challenge) {
   showView('rivalry-view');
+
   document.getElementById('rivalry-name').textContent = challenge.name;
-  document.getElementById('rivalry-duration').textContent = `${challenge.durationDays}d challenge`;
-  const timeLeft = challenge.ended
-    ? 'Ended'
-    : challenge.daysLeft === 1 ? '1 day left' : `${challenge.daysLeft} days left`;
+  document.getElementById('rivalry-dates').textContent = formatDateRange(challenge);
+  const timeLeft = challenge.ended ? 'Ended'
+    : challenge.daysLeft === 1 ? '1 day left'
+    : `${challenge.daysLeft} days left`;
   document.getElementById('rivalry-timeleft').textContent = timeLeft;
 
   const [r1, r2] = challenge.riders;
 
-  document.getElementById('rider1-photo').src = r1.photoUrl || '';
-  document.getElementById('rider1-name').textContent = firstName(r1.name);
-  document.getElementById('rider1-miles').textContent = `${r1.miles} mi`;
+  // Avatars & names
+  document.getElementById('bav1').src = r1.photoUrl || '';
+  document.getElementById('bav2').src = r2.photoUrl || '';
+  document.getElementById('bn1').textContent = firstName(r1.name);
+  document.getElementById('bn2').textContent = firstName(r2.name);
+  document.getElementById('bml1').textContent = `${r1.miles} mi`;
+  document.getElementById('bml2').textContent = `${r2.miles} mi`;
 
-  document.getElementById('rider2-photo').src = r2.photoUrl || '';
-  document.getElementById('rider2-name').textContent = firstName(r2.name);
-  document.getElementById('rider2-miles').textContent = `${r2.miles} mi`;
-
-  // Tug bar
-  const total = r1.miles + r2.miles;
-  const pct = total === 0 ? 50 : Math.round((r1.miles / total) * 100);
-  document.getElementById('tug-bar').style.width = `${pct}%`;
+  // Vertical bars
+  const max = Math.max(r1.miles, r2.miles, 1);
+  // Use requestAnimationFrame so CSS transition fires after paint
+  requestAnimationFrame(() => {
+    document.getElementById('bfill1').style.height = `${(r1.miles / max) * 100}%`;
+    document.getElementById('bfill2').style.height = `${(r2.miles / max) * 100}%`;
+  });
 
   // Lead message
   const msgEl = document.getElementById('lead-message');
+  const total = r1.miles + r2.miles;
   if (total === 0) {
-    msgEl.textContent = "Nobody has ridden yet — get out there! 🚴";
-    msgEl.style.color = '#888';
+    msgEl.textContent = "Nobody has ridden yet — get pedaling! 🚴";
+    msgEl.style.color = '#555';
   } else if (r1.miles === r2.miles) {
     msgEl.textContent = "Dead tie! 🤝";
     msgEl.style.color = '#f5c842';
@@ -239,15 +298,6 @@ function showRivalry(challenge) {
     msgEl.textContent = `${firstName(leader.name)} leads by ${gap} miles 🔥`;
     msgEl.style.color = r1.miles > r2.miles ? '#fc4c02' : '#3b82f6';
   }
-
-  // Individual bars
-  const max = Math.max(r1.miles, r2.miles, 1);
-  document.getElementById('ind1-name').textContent = firstName(r1.name);
-  document.getElementById('ind1-fill').style.width = `${(r1.miles / max) * 100}%`;
-  document.getElementById('ind1-val').textContent = `${r1.miles}`;
-  document.getElementById('ind2-name').textContent = firstName(r2.name);
-  document.getElementById('ind2-fill').style.width = `${(r2.miles / max) * 100}%`;
-  document.getElementById('ind2-val').textContent = `${r2.miles}`;
 }
 
 async function refreshChallenge() {
@@ -261,13 +311,18 @@ async function refreshChallenge() {
 
 function firstName(name) { return name ? name.split(' ')[0] : name; }
 
+function formatDateRange(challenge) {
+  const s = new Date(challenge.startDate * 1000);
+  const e = new Date(challenge.endDate * 1000);
+  const fmt = d => `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+  return `${fmt(s)} – ${fmt(e)}`;
+}
+
 function showError(msg) {
   const el = document.getElementById('error-banner');
   el.textContent = msg;
   el.classList.remove('hidden');
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
-
-// ── Start ─────────────────────────────────────────────────────
 
 init();

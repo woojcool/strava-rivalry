@@ -3,76 +3,102 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Strava Rivalry 🚴</title>
+  <title>Miler</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
     <header>
-      <div class="logo">🚴 Strava Rivalry</div>
+      <div class="logo">Miler</div>
       <div id="user-chip" class="user-chip hidden"></div>
     </header>
 
-    <!-- ── Home view ─────────────────────────────────────────── -->
+    <!-- ── Home ──────────────────────────────────────────────── -->
     <section id="home-view" class="view hidden">
       <div class="hero">
-        <div class="hero-title">Who rides more<br/>this month?</div>
+        <div class="hero-title">Who rides more?</div>
         <div class="hero-sub" id="home-month"></div>
       </div>
 
       <div class="action-cards">
-        <button class="action-card card-orange" onclick="toggleCreatePanel()">
+        <button class="action-card card-orange" onclick="goCreate()">
           <div class="action-icon">⚔️</div>
-          <div class="action-label">Start a Challenge</div>
-          <div class="action-desc">Create a new rivalry and invite a friend</div>
+          <div class="action-text">
+            <div class="action-label">Start a Challenge</div>
+            <div class="action-desc">Create a rivalry and invite a friend</div>
+          </div>
         </button>
         <button class="action-card card-blue" onclick="showJoinPanel()">
           <div class="action-icon">🔗</div>
-          <div class="action-label">Join a Challenge</div>
-          <div class="action-desc">Enter a code from a friend</div>
+          <div class="action-text">
+            <div class="action-label">Join a Challenge</div>
+            <div class="action-desc">Enter a code from a friend</div>
+          </div>
         </button>
       </div>
 
-      <!-- Create panel -->
-      <div id="create-panel" class="create-panel hidden">
-        <div class="panel-label">Challenge name</div>
-        <input id="create-name" class="text-input" placeholder="e.g. June Grind" maxlength="32" />
-        <div class="panel-label" style="margin-top:14px">Duration</div>
-        <div class="duration-options">
-          <button class="dur-btn" data-days="7">1 week</button>
-          <button class="dur-btn" data-days="14">2 weeks</button>
-          <button class="dur-btn selected" data-days="30">1 month</button>
-          <button class="dur-btn" data-days="90">3 months</button>
-        </div>
-        <button class="btn btn-strava" style="width:100%;margin-top:16px" onclick="submitCreateChallenge()">Create &amp; Get Code</button>
-      </div>
-
-      <!-- Join panel -->
       <div id="join-panel" class="join-panel hidden">
         <input id="join-code" class="code-input" placeholder="Enter 6-character code" maxlength="6" />
         <button class="btn btn-blue" onclick="joinChallenge()">Join</button>
       </div>
 
-      <!-- My challenges -->
       <div id="my-challenges-section" class="hidden">
         <div class="section-title">Your Challenges</div>
         <div id="challenges-list" class="challenges-list"></div>
       </div>
 
-      <!-- Not connected prompt -->
       <div id="connect-prompt" class="connect-prompt hidden">
         <p>Connect your Strava to get started</p>
         <a href="/auth/login" class="btn btn-strava">Connect with Strava</a>
       </div>
     </section>
 
-    <!-- ── Waiting view ───────────────────────────────────────── -->
+    <!-- ── Create ─────────────────────────────────────────────── -->
+    <section id="create-view" class="view hidden">
+      <button class="back-btn" onclick="goHome()">← Back</button>
+      <div class="page-title">New Challenge</div>
+
+      <div class="form-block">
+        <div class="field-label">Name</div>
+        <input id="create-name" class="text-input" placeholder="e.g. June Grind" maxlength="32" />
+      </div>
+
+      <div class="form-block">
+        <div class="field-label">Duration</div>
+        <div class="dur-grid">
+          <button class="dur-btn" data-type="days" data-days="7">1 week</button>
+          <button class="dur-btn" data-type="days" data-days="14">2 weeks</button>
+          <button class="dur-btn selected" data-type="days" data-days="30">1 month</button>
+          <button class="dur-btn" data-type="days" data-days="90">3 months</button>
+          <button class="dur-btn dur-month" data-type="month" id="this-month-btn"></button>
+          <button class="dur-btn" data-type="custom">Custom</button>
+        </div>
+
+        <div id="custom-dates" class="custom-dates hidden">
+          <div class="date-row">
+            <div>
+              <div class="field-label-sm">Start date</div>
+              <input type="date" id="custom-start" class="date-input" />
+            </div>
+            <div>
+              <div class="field-label-sm">End date</div>
+              <input type="date" id="custom-end" class="date-input" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-strava btn-full" onclick="submitCreate()">Create & Get Code</button>
+    </section>
+
+    <!-- ── Waiting ────────────────────────────────────────────── -->
     <section id="waiting-view" class="view hidden">
       <button class="back-btn" onclick="goHome()">← Back</button>
-      <div class="connect-card">
-        <div class="connect-icon">⏳</div>
-        <h2>Challenge created!</h2>
-        <p>Share this code with your friend:</p>
+      <div class="waiting-card">
+        <div class="waiting-icon">⏳</div>
+        <h2 id="waiting-title">Challenge created!</h2>
+        <p class="waiting-meta" id="waiting-meta"></p>
+        <p class="waiting-hint">Share this code with your friend:</p>
         <div class="big-code" id="waiting-code"></div>
         <p class="or-text">or share the link</p>
         <div class="share-url">
@@ -82,56 +108,46 @@
       </div>
     </section>
 
-    <!-- ── Rivalry view ──────────────────────────────────────── -->
+    <!-- ── Rivalry ────────────────────────────────────────────── -->
     <section id="rivalry-view" class="view hidden">
       <button class="back-btn" onclick="goHome()">← Back</button>
 
-      <div class="challenge-name" id="rivalry-name"></div>
-      <div class="challenge-meta">
-        <span id="rivalry-duration"></span>
-        <span class="meta-dot">·</span>
-        <span id="rivalry-timeleft"></span>
-      </div>
-
-      <div class="vs-header">
-        <div class="rider-head" id="rider1-head">
-          <img id="rider1-photo" class="avatar" src="" alt="" />
-          <div class="rider-name" id="rider1-name"></div>
-          <div class="rider-miles" id="rider1-miles"></div>
-        </div>
-        <div class="vs-badge">VS</div>
-        <div class="rider-head" id="rider2-head">
-          <img id="rider2-photo" class="avatar" src="" alt="" />
-          <div class="rider-name" id="rider2-name"></div>
-          <div class="rider-miles" id="rider2-miles"></div>
+      <div class="rivalry-header">
+        <div class="rivalry-name" id="rivalry-name"></div>
+        <div class="rivalry-meta">
+          <span id="rivalry-dates"></span>
+          <span class="meta-dot">·</span>
+          <span id="rivalry-timeleft"></span>
         </div>
       </div>
 
-      <div class="bar-arena">
-        <div class="tug-bar-track">
-          <div class="tug-bar" id="tug-bar"></div>
-          <div class="tug-center-line"></div>
+      <!-- Vertical bar chart -->
+      <div class="bar-chart-wrap">
+        <div class="bar-chart">
+          <div class="bar-col" id="bar-col-1">
+            <div class="bar-miles-label" id="bml1"></div>
+            <div class="bar-track">
+              <div class="bar-fill bar-orange" id="bfill1"></div>
+            </div>
+          </div>
+          <div class="bar-col" id="bar-col-2">
+            <div class="bar-miles-label" id="bml2"></div>
+            <div class="bar-track">
+              <div class="bar-fill bar-blue" id="bfill2"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bar-names">
+          <div class="bar-name-label" id="bn1"></div>
+          <div class="bar-name-label" id="bn2"></div>
+        </div>
+        <div class="bar-avatars">
+          <img class="bar-avatar orange-ring" id="bav1" src="" alt="" />
+          <img class="bar-avatar blue-ring"   id="bav2" src="" alt="" />
         </div>
       </div>
 
       <div class="lead-message" id="lead-message"></div>
-
-      <div class="individual-bars">
-        <div class="ind-bar-row">
-          <div class="ind-name" id="ind1-name"></div>
-          <div class="ind-track">
-            <div class="ind-fill fill-orange" id="ind1-fill"></div>
-          </div>
-          <div class="ind-val" id="ind1-val"></div>
-        </div>
-        <div class="ind-bar-row">
-          <div class="ind-name" id="ind2-name"></div>
-          <div class="ind-track">
-            <div class="ind-fill fill-blue" id="ind2-fill"></div>
-          </div>
-          <div class="ind-val" id="ind2-val"></div>
-        </div>
-      </div>
 
       <div class="actions">
         <button class="btn btn-secondary" onclick="refreshChallenge()">↻ Refresh</button>

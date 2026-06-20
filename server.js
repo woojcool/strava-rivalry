@@ -68,7 +68,7 @@ app.get('/auth/callback', async (req, res) => {
         c.miles[athleteId] = miles;
         if (!req.session.myChallenges.includes(pendingId)) req.session.myChallenges.push(pendingId);
       }
-      return res.redirect(`/?challenge=${pendingId}`);
+      return res.redirect(`/c/${pendingId}`);
     }
 
     res.redirect('/');
@@ -84,21 +84,23 @@ app.post('/api/challenge/create', async (req, res) => {
   const athleteId = req.session.athleteId;
   if (!athleteId) return res.status(401).json({ error: 'Not connected' });
 
-  const { name = 'Rivalry', durationDays = 30 } = req.body;
-  const startDate = Math.floor(Date.now() / 1000);
-  const endDate = startDate + durationDays * 86400;
+  const { name = 'Rivalry', startDate, endDate } = req.body;
 
-  const miles = await fetchMilesSince(athletes[athleteId].token, startDate);
+  // startDate/endDate are Unix seconds from the client
+  const start = startDate || Math.floor(Date.now() / 1000);
+  const end = endDate || start + 30 * 86400;
+
+  const miles = await fetchMilesSince(athletes[athleteId].token, start);
   const challengeId = generateId();
   challenges[challengeId] = {
     id: challengeId,
     name,
-    durationDays,
-    startDate,
-    endDate,
+    startDate: start,
+    endDate: end,
     riders: [athleteId],
     miles: { [athleteId]: miles },
   };
+  if (!req.session.myChallenges) req.session.myChallenges = [];
   req.session.myChallenges.push(challengeId);
   res.json({ id: challengeId });
 });
@@ -149,12 +151,13 @@ function formatChallenge(id, currentAthleteId) {
   const nowSec = Math.floor(Date.now() / 1000);
   const secondsLeft = Math.max(0, c.endDate - nowSec);
   const daysLeft = Math.ceil(secondsLeft / 86400);
+  const totalDays = Math.ceil((c.endDate - c.startDate) / 86400);
   return {
     id: c.id,
     name: c.name,
-    durationDays: c.durationDays,
     startDate: c.startDate,
     endDate: c.endDate,
+    totalDays,
     daysLeft,
     ended: secondsLeft === 0,
     full: c.riders.length === 2,
@@ -184,5 +187,10 @@ async function fetchMilesSince(token, afterTs) {
   }
   return Math.round((totalMeters / 1609.344) * 10) / 10;
 }
+
+// Serve index.html for all non-API routes (SPA routing)
+app.get(/^(?!\/api|\/auth).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 app.listen(PORT, () => console.log(`Running on http://localhost:${PORT}`));
