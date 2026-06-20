@@ -156,6 +156,58 @@ header {
   font-family: monospace;
 }
 
+/* Create panel */
+.create-panel {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 12px;
+}
+.panel-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.text-input {
+  width: 100%;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.95rem;
+  padding: 11px 14px;
+  outline: none;
+}
+.text-input:focus { border-color: #fc4c02; }
+.text-input::placeholder { color: #444; }
+
+.duration-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dur-btn {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 10px;
+  color: #aaa;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dur-btn.selected {
+  background: #1f0f00;
+  border-color: #fc4c02;
+  color: #fc4c02;
+}
+.dur-btn:hover:not(.selected) { border-color: #555; color: #fff; }
+
 /* Connect prompt */
 .connect-prompt {
   margin-top: 40px;
@@ -240,14 +292,16 @@ header {
   font-weight: 900;
   margin-top: 4px;
 }
-.challenge-month {
+.challenge-meta {
   font-size: 0.75rem;
   color: #555;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   margin-top: 4px;
   margin-bottom: 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
+.meta-dot { color: #333; }
 
 .vs-header {
   display: flex;

@@ -12,12 +12,11 @@ const CLIENT_ID = process.env.STRAVA_CLIENT_ID;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
 const REDIRECT_URI = (process.env.REDIRECT_URI || `http://localhost:${PORT}/auth/callback`).trim();
 
-// In-memory stores
-const athletes = {}; // athleteId -> { name, photoUrl, token }
-const challenges = {}; // challengeId -> { id, name, riders: [id,...], miles: {id: n}, createdAt }
+const athletes = {};
+const challenges = {};
 
 function generateId() {
-  return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A3F9C1"
+  return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
 app.use(express.json());
@@ -61,12 +60,10 @@ app.get('/auth/callback', async (req, res) => {
     if (!req.session.myChallenges) req.session.myChallenges = [];
 
     const pendingId = req.session.pendingChallenge;
-
-    // If coming from a challenge link, join it
     if (pendingId && challenges[pendingId]) {
       const c = challenges[pendingId];
       if (!c.riders.includes(athleteId) && c.riders.length < 2) {
-        const miles = await fetchMonthlyMiles(access_token);
+        const miles = await fetchMilesSince(access_token, c.startDate);
         c.riders.push(athleteId);
         c.miles[athleteId] = miles;
         if (!req.session.myChallenges.includes(pendingId)) req.session.myChallenges.push(pendingId);
@@ -74,7 +71,6 @@ app.get('/auth/callback', async (req, res) => {
       return res.redirect(`/?challenge=${pendingId}`);
     }
 
-    // Otherwise just land on home — no auto-created challenge
     res.redirect('/');
   } catch (err) {
     console.error('Auth error:', err.response?.data || err.message);
@@ -82,25 +78,30 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Create a challenge (must be logged in)
+// ── API ───────────────────────────────────────────────────────────────────────
+
 app.post('/api/challenge/create', async (req, res) => {
   const athleteId = req.session.athleteId;
   if (!athleteId) return res.status(401).json({ error: 'Not connected' });
 
-  const miles = await fetchMonthlyMiles(athletes[athleteId].token);
+  const { name = 'Rivalry', durationDays = 30 } = req.body;
+  const startDate = Math.floor(Date.now() / 1000);
+  const endDate = startDate + durationDays * 86400;
+
+  const miles = await fetchMilesSince(athletes[athleteId].token, startDate);
   const challengeId = generateId();
   challenges[challengeId] = {
     id: challengeId,
-    name: 'Rivalry',
+    name,
+    durationDays,
+    startDate,
+    endDate,
     riders: [athleteId],
     miles: { [athleteId]: miles },
-    createdAt: Date.now(),
   };
   req.session.myChallenges.push(challengeId);
   res.json({ id: challengeId });
 });
-
-// ── API ───────────────────────────────────────────────────────────────────────
 
 app.get('/api/me', (req, res) => {
   const athleteId = req.session.athleteId;
@@ -126,7 +127,7 @@ app.post('/api/challenge/:id/join', async (req, res) => {
   if (c.riders.length >= 2) return res.status(400).json({ error: 'Challenge is full' });
   if (c.riders.includes(athleteId)) return res.status(400).json({ error: 'Already in this challenge' });
 
-  const miles = await fetchMonthlyMiles(athletes[athleteId].token);
+  const miles = await fetchMilesSince(athletes[athleteId].token, c.startDate);
   c.riders.push(athleteId);
   c.miles[athleteId] = miles;
   if (!req.session.myChallenges) req.session.myChallenges = [];
@@ -138,18 +139,25 @@ app.post('/api/challenge/:id/refresh', async (req, res) => {
   const athleteId = req.session.athleteId;
   const c = challenges[req.params.id];
   if (!c || !athleteId || !c.riders.includes(athleteId)) return res.status(401).json({ error: 'Not authorized' });
-  const miles = await fetchMonthlyMiles(athletes[athleteId].token);
+  const miles = await fetchMilesSince(athletes[athleteId].token, c.startDate);
   c.miles[athleteId] = miles;
   res.json(formatChallenge(req.params.id, athleteId));
 });
 
 function formatChallenge(id, currentAthleteId) {
   const c = challenges[id];
+  const nowSec = Math.floor(Date.now() / 1000);
+  const secondsLeft = Math.max(0, c.endDate - nowSec);
+  const daysLeft = Math.ceil(secondsLeft / 86400);
   return {
     id: c.id,
     name: c.name,
+    durationDays: c.durationDays,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    daysLeft,
+    ended: secondsLeft === 0,
     full: c.riders.length === 2,
-    createdAt: c.createdAt,
     riders: c.riders.map(aid => ({
       id: aid,
       name: athletes[aid]?.name,
@@ -160,9 +168,7 @@ function formatChallenge(id, currentAthleteId) {
   };
 }
 
-async function fetchMonthlyMiles(token) {
-  const now = new Date();
-  const afterTs = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
+async function fetchMilesSince(token, afterTs) {
   let page = 1, totalMeters = 0;
   while (true) {
     const { data } = await axios.get('https://www.strava.com/api/v3/athlete/activities', {

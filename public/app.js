@@ -91,12 +91,23 @@ async function openChallenge(id) {
 
 // ── Home actions ──────────────────────────────────────────────
 
-async function startChallenge() {
-  if (!me.connected) {
-    window.location.href = '/auth/login';
-    return;
-  }
-  const res = await fetch('/api/challenge/create', { method: 'POST' });
+function toggleCreatePanel() {
+  if (!me.connected) { window.location.href = '/auth/login'; return; }
+  const panel = document.getElementById('create-panel');
+  panel.classList.toggle('hidden');
+  document.getElementById('join-panel').classList.add('hidden');
+  if (!panel.classList.contains('hidden')) document.getElementById('create-name').focus();
+}
+
+async function submitCreateChallenge() {
+  const name = document.getElementById('create-name').value.trim() || 'Rivalry';
+  const selected = document.querySelector('.dur-btn.selected');
+  const durationDays = selected ? Number(selected.dataset.days) : 30;
+  const res = await fetch('/api/challenge/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, durationDays }),
+  });
   const { id } = await res.json();
   await openChallenge(id);
 }
@@ -116,6 +127,13 @@ async function joinChallenge() {
 
 document.getElementById('join-code')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') joinChallenge();
+});
+
+document.querySelectorAll('.dur-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
 });
 
 // ── Render: user chip ─────────────────────────────────────────
@@ -185,9 +203,12 @@ function copyUrl() {
 
 function showRivalry(challenge) {
   showView('rivalry-view');
-  const now = new Date();
   document.getElementById('rivalry-name').textContent = challenge.name;
-  document.getElementById('rivalry-month').textContent = `${MONTHS[now.getMonth()]} ${now.getFullYear()} · Bike Miles`;
+  document.getElementById('rivalry-duration').textContent = `${challenge.durationDays}d challenge`;
+  const timeLeft = challenge.ended
+    ? 'Ended'
+    : challenge.daysLeft === 1 ? '1 day left' : `${challenge.daysLeft} days left`;
+  document.getElementById('rivalry-timeleft').textContent = timeLeft;
 
   const [r1, r2] = challenge.riders;
 

@@ -21,7 +21,7 @@
       </div>
 
       <div class="action-cards">
-        <button class="action-card card-orange" onclick="startChallenge()">
+        <button class="action-card card-orange" onclick="toggleCreatePanel()">
           <div class="action-icon">⚔️</div>
           <div class="action-label">Start a Challenge</div>
           <div class="action-desc">Create a new rivalry and invite a friend</div>
@@ -31,6 +31,20 @@
           <div class="action-label">Join a Challenge</div>
           <div class="action-desc">Enter a code from a friend</div>
         </button>
+      </div>
+
+      <!-- Create panel -->
+      <div id="create-panel" class="create-panel hidden">
+        <div class="panel-label">Challenge name</div>
+        <input id="create-name" class="text-input" placeholder="e.g. June Grind" maxlength="32" />
+        <div class="panel-label" style="margin-top:14px">Duration</div>
+        <div class="duration-options">
+          <button class="dur-btn" data-days="7">1 week</button>
+          <button class="dur-btn" data-days="14">2 weeks</button>
+          <button class="dur-btn selected" data-days="30">1 month</button>
+          <button class="dur-btn" data-days="90">3 months</button>
+        </div>
+        <button class="btn btn-strava" style="width:100%;margin-top:16px" onclick="submitCreateChallenge()">Create &amp; Get Code</button>
       </div>
 
       <!-- Join panel -->
@@ -73,7 +87,11 @@
       <button class="back-btn" onclick="goHome()">← Back</button>
 
       <div class="challenge-name" id="rivalry-name"></div>
-      <div class="challenge-month" id="rivalry-month"></div>
+      <div class="challenge-meta">
+        <span id="rivalry-duration"></span>
+        <span class="meta-dot">·</span>
+        <span id="rivalry-timeleft"></span>
+      </div>
 
       <div class="vs-header">
         <div class="rider-head" id="rider1-head">
