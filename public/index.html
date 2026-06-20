@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strava Rivalry 🚴</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">🚴 Strava Rivalry</div>
+      <div class="subtitle" id="month-label"></div>
+    </header>
+
+    <main>
+      <!-- Not connected state -->
+      <section id="connect-section" class="hidden">
+        <div class="connect-card">
+          <div class="connect-icon">🔗</div>
+          <h2>Connect your Strava</h2>
+          <p>Link your account to join the rivalry. Your friend needs to connect too!</p>
+          <a href="/auth/login" class="btn btn-strava">Connect with Strava</a>
+        </div>
+      </section>
+
+      <!-- Waiting for friend state -->
+      <section id="waiting-section" class="hidden">
+        <div class="connect-card">
+          <div class="connect-icon">⏳</div>
+          <h2>You're in!</h2>
+          <p id="waiting-name" class="waiting-name"></p>
+          <p>Now have your friend open this page and connect their Strava.</p>
+          <div class="share-url">
+            <span id="share-url-text"></span>
+            <button class="copy-btn" onclick="copyUrl()">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Rivalry board -->
+      <section id="rivalry-section" class="hidden">
+        <div class="rivalry-container">
+          <div class="vs-header">
+            <div class="rider-head" id="rider1-head">
+              <img id="rider1-photo" class="avatar" src="" alt="" />
+              <div class="rider-name" id="rider1-name"></div>
+              <div class="rider-miles" id="rider1-miles"></div>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="rider-head" id="rider2-head">
+              <img id="rider2-photo" class="avatar" src="" alt="" />
+              <div class="rider-name" id="rider2-name"></div>
+              <div class="rider-miles" id="rider2-miles"></div>
+            </div>
+          </div>
+
+          <div class="bar-arena">
+            <div class="bar-label" id="bar-label-left"></div>
+            <div class="tug-bar-track">
+              <div class="tug-bar" id="tug-bar"></div>
+              <div class="tug-center-line"></div>
+            </div>
+            <div class="bar-label" id="bar-label-right"></div>
+          </div>
+
+          <div class="lead-message" id="lead-message"></div>
+
+          <div class="individual-bars">
+            <div class="ind-bar-row">
+              <div class="ind-name" id="ind1-name"></div>
+              <div class="ind-track">
+                <div class="ind-fill fill-orange" id="ind1-fill"></div>
+              </div>
+              <div class="ind-val" id="ind1-val"></div>
+            </div>
+            <div class="ind-bar-row">
+              <div class="ind-name" id="ind2-name"></div>
+              <div class="ind-track">
+                <div class="ind-fill fill-blue" id="ind2-fill"></div>
+              </div>
+              <div class="ind-val" id="ind2-val"></div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="loadStatus()">↻ Refresh</button>
+            <button class="btn btn-danger" onclick="resetAll()">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Error -->
+      <div id="error-banner" class="error-banner hidden"></div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
