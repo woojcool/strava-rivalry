@@ -267,18 +267,15 @@ function showRivalry(challenge) {
 
   const [r1, r2] = challenge.riders;
 
-  // Names
-  document.getElementById('bn1').textContent = firstName(r1.name);
-  document.getElementById('bn2').textContent = firstName(r2.name);
-  document.getElementById('bml1').textContent = `${r1.miles} mi`;
-  document.getElementById('bml2').textContent = `${r2.miles} mi`;
-
-  // Vertical bars
+  // Horizontal bars
   const max = Math.max(r1.miles, r2.miles, 1);
-  // Use requestAnimationFrame so CSS transition fires after paint
+  document.getElementById('hname1').textContent = firstName(r1.name);
+  document.getElementById('hname2').textContent = firstName(r2.name);
+  document.getElementById('hval1').textContent = `${r1.miles} mi`;
+  document.getElementById('hval2').textContent = `${r2.miles} mi`;
   requestAnimationFrame(() => {
-    document.getElementById('bfill1').style.height = `${(r1.miles / max) * 100}%`;
-    document.getElementById('bfill2').style.height = `${(r2.miles / max) * 100}%`;
+    document.getElementById('hfill1').style.width = `${(r1.miles / max) * 100}%`;
+    document.getElementById('hfill2').style.width = `${(r2.miles / max) * 100}%`;
   });
 
   // Stats grid
